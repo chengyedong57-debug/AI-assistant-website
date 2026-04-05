@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+    <meta charset="UTF-8">
+    <title>社交暴露疗法 - AI 大模型版</title>
+    <style>
+        body { text-align: center; background: #8fbc8f; font-family: 'Microsoft YaHei', sans-serif; margin: 0; padding: 20px; }
+        h2 { color: white; text-shadow: 1px 1px 2px rgba(0,0,0,0.5); }
+        canvas { background: #90EE90; border: 4px solid #fff; border-radius: 10px; box-shadow: 0 10px 20px rgba(0,0,0,0.2); cursor: pointer; }
+        #dialogue-box { display: none; width: 460px; background: rgba(255, 255, 255, 0.95); border: 4px solid #795548; border-radius: 10px; margin: -80px auto 0 auto; padding: 20px; text-align: left; font-size: 16px; box-shadow: 0 5px 25px rgba(0,0,0,0.3); position: relative; z-index: 10; }
+        #chat-history { max-height: 150px; overflow-y: auto; margin-bottom: 15px; padding-right: 10px; }
+        #chat-history p { margin: 8px 0; line-height: 1.5; }
+        .npc-msg { color: #d35400; }
+        .player-msg { color: #2980b9; font-weight: bold; }
+        .thinking { font-style: italic; color: #7f8c8d; }
+        #input-area { display: flex; gap: 10px; border-top: 2px dashed #ccc; padding-top: 15px; }
+        #player-input { flex-grow: 1; padding: 8px 12px; font-size: 16px; border: 2px solid #bdc3c7; border-radius: 5px; outline: none; }
+        button { padding: 8px 15px; font-size: 16px; background-color: #2ecc71; color: white; border: none; border-radius: 5px; cursor: pointer; }
+        .close-btn { background-color: #e74c3c; }
+    </style>
+</head>
+<body>
+    <h2>🖱️ 点击屏幕移动 | 本地 AI 大模型已接入</h2>
+    <canvas id="gameCanvas" width="500" height="400"></canvas>
+    
+    <div id="dialogue-box">
+        <div id="chat-history"></div>
+        <div id="input-area">
+            <input type="text" id="player-input" placeholder="输入你想说的话..." autocomplete="off">
+            <button onclick="sendMessage()">发送</button>
+            <button class="close-btn" onclick="closeDialogue()">离开</button>
+        </div>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        const dialogBox = document.getElementById('dialogue-box');
+        const chatHistory = document.getElementById('chat-history');
+        const inputField = document.getElementById('player-input');
+
+        let isTalking = false;
+
+        const bgImg = new Image(); bgImg.src = 'bg.jpg';
+        const playerImg = new Image(); playerImg.src = 'player.png'; 
+        const npcImg = new Image(); npcImg.src = 'npc.png';       
+
+        let player = { x: 100, y: 150, size: 40, color: '#3498db', targetX: 100, targetY: 150, speed: 3, intentToTalk: false };
+        let npc = { x: 350, y: 150, size: 40, color: '#e67e22', name: '店长', text: '你好呀！欢迎来到幸福村。我是你的管家，无论有什么烦恼都可以跟我说哦。' };
+
+        function update() {
+            if (isTalking) return; 
+            let dx = player.targetX - player.x; let dy = player.targetY - player.y; let distance = Math.sqrt(dx * dx + dy * dy);
+            if (distance > player.speed) { player.x += (dx / distance) * player.speed; player.y += (dy / distance) * player.speed; } 
+            else { player.x = player.targetX; player.y = player.targetY; }
+
+            if (player.intentToTalk) {
+                if (Math.sqrt(Math.pow(player.x - npc.x, 2) + Math.pow(player.y - npc.y, 2)) < 70) { 
+                    startDialogue(); player.intentToTalk = false; player.targetX = player.x; player.targetY = player.y;
+                }
+            }
+        }
+
+        function draw() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            if (bgImg.complete && bgImg.naturalWidth !== 0) ctx.drawImage(bgImg, 0, 0, canvas.width, canvas.height);
+            
+            if (Math.abs(player.x - player.targetX) > 1 || Math.abs(player.y - player.targetY) > 1) {
+                ctx.fillStyle = 'rgba(255, 255, 255, 0.6)'; ctx.beginPath(); ctx.arc(player.targetX + player.size/2, player.targetY + player.size/2, 4, 0, Math.PI*2); ctx.fill();
+            }
+
+            if (npcImg.complete && npcImg.naturalWidth !== 0) ctx.drawImage(npcImg, npc.x, npc.y, npc.size, npc.size); else { ctx.fillStyle = npc.color; ctx.fillRect(npc.x, npc.y, npc.size, npc.size); }
+            ctx.fillStyle = 'white'; ctx.font = 'bold 13px Arial'; ctx.textAlign = "center"; ctx.shadowColor = "black"; ctx.shadowBlur = 4; ctx.fillText("店长", npc.x + npc.size/2, npc.y - 8); ctx.shadowBlur = 0;
+
+            if (playerImg.complete && playerImg.naturalWidth !== 0) ctx.drawImage(playerImg, player.x, player.y, player.size, player.size); else { ctx.fillStyle = player.color; ctx.fillRect(player.x, player.y, player.size, player.size); }
+            ctx.fillStyle = 'white'; ctx.shadowColor = "black"; ctx.shadowBlur = 4; ctx.fillText("你", player.x + player.size/2, player.y - 8); ctx.shadowBlur = 0;
+        }
+
+        function gameLoop() { update(); draw(); requestAnimationFrame(gameLoop); }
+
+        canvas.addEventListener('mousedown', (e) => {
+            if (isTalking) return; 
+            const rect = canvas.getBoundingClientRect(); const clickX = e.clientX - rect.left; const clickY = e.clientY - rect.top;
+            if (clickX >= npc.x && clickX <= npc.x + npc.size && clickY >= npc.y && clickY <= npc.y + npc.size) {
+                if (Math.sqrt(Math.pow(player.x - npc.x, 2) + Math.pow(player.y - npc.y, 2)) < 70) { startDialogue(); player.targetX = player.x; player.targetY = player.y; } 
+                else { player.targetX = npc.x; player.targetY = npc.y; player.intentToTalk = true; }
+            } else {
+                player.targetX = Math.max(0, Math.min(canvas.width - player.size, clickX - player.size / 2)); player.targetY = Math.max(0, Math.min(canvas.height - player.size, clickY - player.size / 2)); player.intentToTalk = false; 
+            }
+        });
+
+        function startDialogue() {
+            isTalking = true; dialogBox.style.display = 'block';
+            chatHistory.innerHTML = `<p class="npc-msg"><strong>${npc.name}:</strong> ${npc.text}</p>`;
+            inputField.value = ''; inputField.focus(); 
+        }
+
+        function closeDialogue() { isTalking = false; dialogBox.style.display = 'none'; }
+
+        // ========================================================
+        // 🚀 核心修改区：调用本地 AI 大模型
+        // ========================================================
+        
+        // 1. 将 sendMessage 改为异步函数 (async)
+        async function sendMessage() {
+            let message = inputField.value.trim();
+            if (!message) return;
+
+            // 打印玩家的话
+            chatHistory.innerHTML += `<p class="player-msg"><strong>你:</strong> ${message}</p>`;
+            inputField.value = ''; 
+            chatHistory.scrollTop = chatHistory.scrollHeight;
+
+            // 临时显示“正在思考...”状态
+            const thinkingId = "msg-" + Date.now();
+            chatHistory.innerHTML += `<p class="npc-msg thinking" id="${thinkingId}"><strong>${npc.name}:</strong> 正在思考...</p>`;
+            chatHistory.scrollTop = chatHistory.scrollHeight;
+
+            try {
+                // 等待大模型的回复
+                let reply = await getLocalLLMReply(message);
+                // 替换掉“正在思考...”的文本
+                document.getElementById(thinkingId).innerHTML = `<strong>${npc.name}:</strong> ${reply}`;
+                document.getElementById(thinkingId).classList.remove("thinking");
+            } catch (error) {
+                // 如果模型没开启或报错
+                document.getElementById(thinkingId).innerHTML = `<strong>${npc.name}:</strong> （模型连接失败。请检查本地模型软件是否开启运行，并允许跨域请求。）`;
+                console.error("模型请求错误:", error);
+            }
+            chatHistory.scrollTop = chatHistory.scrollHeight;
+        }
+
+        // 2. 真正向本地模型发请求的函数
+        async function getLocalLLMReply(userMessage) {
+            // 【注意】：以下 API 默认兼容 LM Studio / text-generation-webui 等支持 OpenAI 格式的软件
+            // 如果你用的是 Ollama，请看我在代码小课堂里的讲解修改这里。
+              //    const API_URL = "http://127.0.0.1:1234/v1/chat/completions"; 
+	       const API_URL = " https://improved-lib-folders-restore.trycloudflare.com/v1/chat/completions  "; 
+
+            // fetch 就是浏览器用来向服务器发数据的工具
+            const response = await fetch(API_URL, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    messages:[
+                        { 
+                            // 【人设注入区】：你可以随意修改这段话，塑造完全不同的NPC性格！
+			    //你现在是安全小镇的店长，名叫店长。你是一个极其温柔、有同理心、懂心理学的倾听者。面对社恐或焦虑的玩家，你会给予简短、温暖且包容的回答。回答请保持口语化，不要超过50个字，不要像人工智能机器人一样说话。
+                            role: "system", 
+                            content: "你现在是一名名为小琳的女性心理治疗师，温柔且极具同理心。核心任务：1.你需要敏锐地观察玩家的发言情绪。2.如果玩家表现出社恐、焦虑或不安，请给予简短、温暖且包容的安慰。3.如果玩家表现正常、轻松，请以朋友般自然、友好的方式进行日常对谈。要求：口语化，不超100字，严禁复读‘作为AI’，像真人一样思考。" 
+                        },
+                        { 
+                            role: "user", 
+                            content: userMessage 
+                        }
+                    ],
+                    temperature: 0.5, // 想象力数值（0-1，0最死板，1最丰富）
+                    max_tokens: 150   // 限制他不要长篇大论
+                })
+            });
+
+            const data = await response.json();
+            return data.choices[0].message.content; // 把 AI 的回答剥离出来返回
+        }
+
+        window.addEventListener('keydown', (e) => {
+            if (isTalking) {
+                if (e.key === 'Enter') sendMessage();
+                if (e.key === 'Escape') closeDialogue();
+            }
+        });
+
+        gameLoop();
+    </script>
+</body>
+</html>
